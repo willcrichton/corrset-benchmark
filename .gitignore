@@ -1,0 +1,5 @@
+*.trace
+target/
+.env
+.ipynb_checkpoints/
+data-large.json
