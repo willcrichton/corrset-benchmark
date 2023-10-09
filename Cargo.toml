@@ -5,19 +5,20 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+progress = []
+
 [dependencies]
-GSL = "6.0.0"
 float-ord = "0.3.2"
 fxhash = "0.2.1"
-# indexical = "0.3.1"
-indexical = {path = "/Users/will/Code/indexical", features = ["simd"]}
+indexical = { version = "0.4.0", features = ["simd"] }
 itertools = "0.11.0"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
 rand = "0.8.5"
 uuid = { version = "1.4.1", features = ["v4"] }
 anyhow = "1.0.75"
-indicatif = {version = "0.17.7", features = ["rayon"]}
+indicatif = "0.17.7"
 rayon = "1.8.0"
 arrayvec = "0.7.4"
 
