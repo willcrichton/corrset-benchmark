@@ -169,6 +169,7 @@ dependencies = [
  "indexical",
  "indicatif",
  "itertools 0.11.0",
+ "maplit",
  "rand",
  "rayon",
  "serde",
@@ -330,9 +331,9 @@ checksum = "74086667896a940438f2118212f313abba4aff3831fef6f4b17d02add5c8bb60"
 
 [[package]]
 name = "indexical"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ca90a8f560809733da2c3ca6f0b10beec6528355a7dfedc614335a084cb64ad"
+checksum = "2254f1b0935a62d865cf1ac1c67f1a48ab6bf7bfafedc1904826424d6f3f1c7c"
 dependencies = [
  "bitvec",
  "fxhash",
@@ -430,6 +431,12 @@ name = "log"
 version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
+
+[[package]]
+name = "maplit"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "memchr"

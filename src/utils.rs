@@ -2,6 +2,7 @@ use arrayvec::ArrayVec;
 use fxhash::FxHashMap as HashMap;
 use std::hash::Hash;
 
+#[inline]
 pub fn correlation(a: &[f64], b: &[f64]) -> f64 {
   let n = a.len();
   let mean_a = a[..n].iter().sum::<f64>() / (n as f64);
@@ -26,7 +27,12 @@ pub fn correlation(a: &[f64], b: &[f64]) -> f64 {
 }
 
 #[allow(unused)]
-pub fn with_pb<I>(n: usize, k: usize, it: impl Iterator<Item = I>) -> impl Iterator<Item = I> {
+#[inline]
+pub fn with_pb<I>(
+  n: usize,
+  k: usize,
+  it: impl Iterator<Item = I> + Send,
+) -> impl Iterator<Item = I> + Send {
   #[cfg(feature = "progress")]
   {
     use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
@@ -62,26 +68,38 @@ pub fn group_by<K1: Eq + Hash, K2: Eq + Hash, V>(
 pub trait Captures<'a> {}
 impl<'a, T: ?Sized> Captures<'a> for T {}
 
-pub struct Chunked<const N: usize, I: Iterator> {
+pub struct Batched<const N: usize, I: Iterator> {
   iter: I,
 }
 
-pub trait IteratorChunkedExt: Sized + Iterator {
-  fn chunked<const N: usize>(self) -> Chunked<N, Self>;
+pub trait IteratorBatchedExt: Sized + Iterator {
+  fn batched<const N: usize>(self) -> Batched<N, Self>;
 }
 
-impl<I: Sized + Iterator> IteratorChunkedExt for I {
-  fn chunked<const N: usize>(self) -> Chunked<N, Self> {
-    Chunked { iter: self }
+impl<I: Sized + Iterator> IteratorBatchedExt for I {
+  fn batched<const N: usize>(self) -> Batched<N, Self> {
+    Batched { iter: self }
   }
 }
 
-impl<const N: usize, I: Iterator> Iterator for Chunked<N, I> {
+impl<const N: usize, I: Iterator> Iterator for Batched<N, I> {
   type Item = ArrayVec<I::Item, N>;
 
   #[inline]
   fn next(&mut self) -> Option<Self::Item> {
-    let chunk = ArrayVec::from_iter((&mut self.iter).take(N));
-    (!chunk.is_empty()).then_some(chunk)
+    let batch = ArrayVec::from_iter((&mut self.iter).take(N));
+    (!batch.is_empty()).then_some(batch)
   }
+}
+
+#[test]
+fn test_batched() {
+  assert_eq!(
+    [0, 1, 2, 3, 4]
+      .into_iter()
+      .batched::<2>()
+      .map(|v| v.to_vec())
+      .collect::<Vec<_>>(),
+    vec![vec![0, 1], vec![2, 3], vec![4]]
+  );
 }

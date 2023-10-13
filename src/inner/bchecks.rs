@@ -77,3 +77,11 @@ impl<'a> CorrSetInner<'a> for BchecksCorrSet<'a> {
     utils::correlation(&qs_scores, &grand_scores)
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::test_inner;
+
+  test_inner!(bchecks, BchecksCorrSet);
+}

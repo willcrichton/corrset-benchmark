@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 pub type QuestionEntry<'a> = (
   IndexVec<UserIdx, u32>,
-  IndexSet<'a, UserRef<'a>, SimdBitset<u64, 4>, ArcFamily>,
+  IndexSet<'a, UserRef<'a>, SimdBitset<u64, 16>, ArcFamily>,
 );
 pub struct AllocCorrSet<'a> {
   questions: Arc<IndexedDomain<QuestionRef<'a>>>,
@@ -21,10 +21,12 @@ pub struct AllocCorrSet<'a> {
 impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
   type Q = QuestionIdx;
   type Scratch = (
-    (Vec<f64>, Vec<f64>),
-    IndexSet<'a, UserRef<'a>, SimdBitset<u64, 4>, ArcFamily>,
+    Vec<f64>,
+    Vec<f64>,
+    IndexSet<'a, UserRef<'a>, SimdBitset<u64, 16>, ArcFamily>,
   );
 
+  #[inline]
   fn build(data: &'a [Row]) -> Self {
     let (users, questions): (HashSet<_>, HashSet<_>) = data
       .iter()
@@ -68,22 +70,27 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
     }
   }
 
+  #[inline]
   fn iter_qs(&self) -> impl Iterator<Item = QuestionIdx> + Captures<'a> + '_ {
     self.questions.indices()
   }
 
+  #[inline]
   fn to_question(&self, q: Self::Q) -> &'a Question {
     self.questions.value(q).0
   }
 
+  #[inline]
   fn init_scratch(&self) -> Self::Scratch {
     (
-      (vec![0.; self.users.len()], vec![0.; self.users.len()]),
+      vec![0.; self.users.len()],
+      vec![0.; self.users.len()],
       IndexSet::new(&self.users),
     )
   }
 
-  fn corr_set(&self, (bufs, users): &mut Self::Scratch, qs: &[Self::Q]) -> f64 {
+  #[inline]
+  fn corr_set(&self, (qs_scores, grand_scores, users): &mut Self::Scratch, qs: &[Self::Q]) -> f64 {
     users.clone_from(&self.q_to_score[qs[0]].1);
     for q in &qs[1..] {
       users.intersect(&self.q_to_score[*q].1);
@@ -100,11 +107,19 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
         .sum::<u32>();
       let grand_total = unsafe { *self.grand_totals.raw.get_unchecked(u.index()) };
       unsafe {
-        *bufs.0.get_unchecked_mut(i) = total as f64;
-        *bufs.1.get_unchecked_mut(i) = grand_total as f64;
+        *qs_scores.get_unchecked_mut(i) = total as f64;
+        *grand_scores.get_unchecked_mut(i) = grand_total as f64;
       }
       n += 1;
     }
-    utils::correlation(&bufs.0[..n], &bufs.1[..n])
+    utils::correlation(&qs_scores[..n], &grand_scores[..n])
   }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::test_inner;
+
+  test_inner!(alloc, AllocCorrSet);
 }

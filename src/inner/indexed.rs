@@ -99,3 +99,11 @@ impl<'a> CorrSetInner<'a> for IndexedCorrSet<'a> {
     utils::correlation(&qs_scores, &grand_scores)
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::test_inner;
+
+  test_inner!(indexed, IndexedCorrSet);
+}

@@ -18,7 +18,7 @@ pub struct BitsetCorrSet<'a, S: BitSet> {
 }
 
 pub type BvecCorrSet<'a> = BitsetCorrSet<'a, indexical::impls::BitVec>;
-pub type SimdCorrSet<'a> = BitsetCorrSet<'a, indexical::impls::SimdBitset<u64, 4>>;
+pub type SimdCorrSet<'a> = BitsetCorrSet<'a, indexical::impls::SimdBitset<u64, 16>>;
 
 impl<'a, S: BitSet + Send + Sync> CorrSetInner<'a> for BitsetCorrSet<'a, S> {
   type Q = QuestionIdx;
@@ -98,4 +98,12 @@ impl<'a, S: BitSet + Send + Sync> CorrSetInner<'a> for BitsetCorrSet<'a, S> {
       .unzip();
     utils::correlation(&qs_scores, &grand_scores)
   }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::test_inner;
+
+  test_inner!(bitset, BvecCorrSet);
 }

@@ -1,4 +1,5 @@
-use crate::{Question, Row};
+use crate::{utils, Question, Row};
+use itertools::Itertools;
 
 pub mod alloc;
 pub mod bchecks;
@@ -6,6 +7,8 @@ pub mod bitset;
 pub mod indexed;
 pub mod ivec;
 pub mod naive;
+#[cfg(test)]
+mod test_utils;
 
 pub trait CorrSetInner<'a>: Send + Sync + Sized {
   type Q: Send + Clone;
@@ -15,6 +18,15 @@ pub trait CorrSetInner<'a>: Send + Sync + Sized {
   fn to_question(&self, q: Self::Q) -> &'a Question;
   fn init_scratch(&self) -> Self::Scratch;
   fn corr_set(&self, scratch: &mut Self::Scratch, qs: &[Self::Q]) -> f64;
+  fn combinations<'b>(
+    &'b self,
+    k: usize,
+  ) -> impl Iterator<Item = Vec<<Self as CorrSetInner<'a>>::Q>> + Send + 'b
+  where
+    'a: 'b,
+  {
+    utils::with_pb(self.iter_qs().count(), k, self.iter_qs().combinations(k))
+  }
 }
 
 #[macro_export]

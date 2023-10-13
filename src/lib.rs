@@ -10,7 +10,7 @@ pub mod outer;
 mod utils;
 
 pub use inner::{inner_names, CorrSetInner};
-pub use outer::CorrSetOuter;
+pub use outer::{outer_names, CorrSetOuter};
 
 #[derive(PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Debug)]
 pub struct User(pub String);
@@ -18,7 +18,7 @@ pub struct User(pub String);
 #[derive(PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Debug)]
 pub struct Question(pub String);
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Row {
   pub user: User,
   pub question: Question,

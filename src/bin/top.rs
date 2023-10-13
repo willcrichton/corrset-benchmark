@@ -13,7 +13,8 @@ fn main() {
     let outer = O::new();
     fn run_inner<'a, I: CorrSetInner<'a>>(data: &'a [Row], k: usize, outer: impl CorrSetOuter) {
       let cs = I::build(data);
-      println!("{:#?}", outer.k_sets(&cs, k));
+      let combs = cs.combinations(k);
+      println!("{:#?}", outer.k_set(&cs, combs));
     }
     dispatch_inner_method!(inner_method, run_inner, data, k, outer);
   }
