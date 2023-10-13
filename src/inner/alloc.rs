@@ -1,21 +1,22 @@
 use super::{
-  indexed::{QuestionIdx, QuestionRef, UserIdx, UserRef},
+  indexed::{QuestionIdx, QuestionRef, UserRef},
+  ivec::{QuestionMap, UserMap},
   CorrSetInner,
 };
 use crate::{utils, utils::Captures, Question, Row};
 use fxhash::FxHashSet as HashSet;
-use indexical::{impls::SimdBitset, index_vec::IndexVec, ArcFamily, IndexSet, IndexedDomain};
+use indexical::{bitset::simd::SimdBitset, pointer::ArcFamily, IndexSet, IndexedDomain};
 use std::sync::Arc;
 
 pub type QuestionEntry<'a> = (
-  IndexVec<UserIdx, u32>,
+  UserMap<'a, u32>,
   IndexSet<'a, UserRef<'a>, SimdBitset<u64, 16>, ArcFamily>,
 );
 pub struct AllocCorrSet<'a> {
   questions: Arc<IndexedDomain<QuestionRef<'a>>>,
   users: Arc<IndexedDomain<UserRef<'a>>>,
-  q_to_score: IndexVec<QuestionIdx, QuestionEntry<'a>>,
-  grand_totals: IndexVec<UserIdx, u32>,
+  q_to_score: QuestionMap<'a, QuestionEntry<'a>>,
+  grand_totals: UserMap<'a, u32>,
 }
 
 impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
@@ -35,32 +36,28 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
     let users = Arc::new(IndexedDomain::from_iter(users));
     let questions = Arc::new(IndexedDomain::from_iter(questions));
 
-    let empty_vec = IndexVec::from_iter(users.indices().map(|_| 0));
-    let empty_set = IndexSet::new(&users);
-    let mut q_to_score = IndexVec::from_iter(
-      questions
-        .indices()
-        .map(|_| (empty_vec.clone(), empty_set.clone())),
-    );
+    let mut q_to_score = QuestionMap::new(&questions, |_| {
+      (
+        UserMap::<'_, u32>::new(&users, |_| 0),
+        IndexSet::new(&users),
+      )
+    });
     for r in data {
       let (q_idx, u_idx) = (
         questions.index(&QuestionRef(&r.question)),
         users.index(&UserRef(&r.user)),
       );
-      let (scores, set) = &mut q_to_score[q_idx];
-      scores[u_idx] = r.score;
+      let (scores, set) = q_to_score.get_mut(q_idx).unwrap();
+      scores.insert(u_idx, r.score);
       set.insert(u_idx);
     }
 
-    let grand_totals = users
-      .indices()
-      .map(|user| {
-        q_to_score
-          .iter()
-          .filter_map(|(scores, set)| set.contains(user).then_some(scores[user]))
-          .sum::<u32>()
-      })
-      .collect::<IndexVec<_, _>>();
+    let grand_totals = UserMap::new(&users, |u| {
+      q_to_score
+        .values()
+        .filter_map(|(scores, set)| set.contains(u).then_some(*scores.get(u).unwrap()))
+        .sum::<u32>()
+    });
 
     AllocCorrSet {
       questions,
@@ -101,11 +98,11 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
       let total = qs
         .iter()
         .map(|q| unsafe {
-          let (u_scores, _) = self.q_to_score.raw.get_unchecked(q.index());
-          *u_scores.raw.get_unchecked(u.index())
+          let (u_scores, _) = self.q_to_score.get_unchecked(*q);
+          *u_scores.get_unchecked(u)
         })
         .sum::<u32>();
-      let grand_total = unsafe { *self.grand_totals.raw.get_unchecked(u.index()) };
+      let grand_total = unsafe { *self.grand_totals.get_unchecked(u) };
       unsafe {
         *qs_scores.get_unchecked_mut(i) = total as f64;
         *grand_scores.get_unchecked_mut(i) = grand_total as f64;

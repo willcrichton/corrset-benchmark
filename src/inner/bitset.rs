@@ -1,24 +1,22 @@
 use super::{
-  indexed::{QuestionIdx, QuestionRef, UserIdx, UserRef},
+  indexed::{QuestionIdx, QuestionRef, UserRef},
+  ivec::{QuestionMap, UserMap},
   CorrSetInner,
 };
 use crate::{utils, utils::Captures, Question, Row};
 use fxhash::FxHashSet as HashSet;
-use indexical::{index_vec::IndexVec, ArcFamily, BitSet, IndexSet, IndexedDomain};
+use indexical::{bitset::BitSet, pointer::ArcFamily, IndexSet, IndexedDomain};
 use std::sync::Arc;
 
-pub type QuestionEntry<'a, S> = (
-  IndexVec<UserIdx, u32>,
-  IndexSet<'a, UserRef<'a>, S, ArcFamily>,
-);
+pub type QuestionEntry<'a, S> = (UserMap<'a, u32>, IndexSet<'a, UserRef<'a>, S, ArcFamily>);
 pub struct BitsetCorrSet<'a, S: BitSet> {
   questions: Arc<IndexedDomain<QuestionRef<'a>>>,
-  q_to_score: IndexVec<QuestionIdx, QuestionEntry<'a, S>>,
-  grand_totals: IndexVec<UserIdx, u32>,
+  q_to_score: QuestionMap<'a, QuestionEntry<'a, S>>,
+  grand_totals: UserMap<'a, u32>,
 }
 
-pub type BvecCorrSet<'a> = BitsetCorrSet<'a, indexical::impls::BitVec>;
-pub type SimdCorrSet<'a> = BitsetCorrSet<'a, indexical::impls::SimdBitset<u64, 16>>;
+pub type BvecCorrSet<'a> = BitsetCorrSet<'a, indexical::bitset::bitvec::BitVec>;
+pub type SimdCorrSet<'a> = BitsetCorrSet<'a, indexical::bitset::simd::SimdBitset<u64, 16>>;
 
 impl<'a, S: BitSet + Send + Sync> CorrSetInner<'a> for BitsetCorrSet<'a, S> {
   type Q = QuestionIdx;
@@ -32,32 +30,28 @@ impl<'a, S: BitSet + Send + Sync> CorrSetInner<'a> for BitsetCorrSet<'a, S> {
     let users = Arc::new(IndexedDomain::from_iter(users));
     let questions = Arc::new(IndexedDomain::from_iter(questions));
 
-    let empty_vec = IndexVec::from_iter(users.indices().map(|_| 0));
-    let empty_set = IndexSet::new(&users);
-    let mut q_to_score = IndexVec::from_iter(
-      questions
-        .indices()
-        .map(|_| (empty_vec.clone(), empty_set.clone())),
-    );
+    let mut q_to_score = QuestionMap::new(&questions, |_| {
+      (
+        UserMap::<'_, u32>::new(&users, |_| 0),
+        IndexSet::new(&users),
+      )
+    });
     for r in data {
       let (q_idx, u_idx) = (
         questions.index(&QuestionRef(&r.question)),
         users.index(&UserRef(&r.user)),
       );
-      let (scores, set) = &mut q_to_score[q_idx];
-      scores[u_idx] = r.score;
+      let (scores, set) = q_to_score.get_mut(q_idx).unwrap();
+      scores.insert(u_idx, r.score);
       set.insert(u_idx);
     }
 
-    let grand_totals = users
-      .indices()
-      .map(|user| {
-        q_to_score
-          .iter()
-          .filter_map(|(scores, set)| set.contains(user).then_some(scores[user]))
-          .sum::<u32>()
-      })
-      .collect::<IndexVec<_, _>>();
+    let grand_totals = UserMap::new(&users, |u| {
+      q_to_score
+        .values()
+        .filter_map(|(scores, set)| set.contains(u).then_some(*scores.get(u).unwrap()))
+        .sum::<u32>()
+    });
 
     BitsetCorrSet {
       questions,
@@ -88,11 +82,11 @@ impl<'a, S: BitSet + Send + Sync> CorrSetInner<'a> for BitsetCorrSet<'a, S> {
         let total = qs
           .iter()
           .map(|q| unsafe {
-            let (u_scores, _) = self.q_to_score.raw.get_unchecked(q.index());
-            *u_scores.raw.get_unchecked(u.index())
+            let (u_scores, _) = self.q_to_score.get_unchecked(*q);
+            *u_scores.get_unchecked(u)
           })
           .sum::<u32>();
-        let grand_total = unsafe { *self.grand_totals.raw.get_unchecked(u.index()) };
+        let grand_total = unsafe { *self.grand_totals.get_unchecked(u) };
         (total as f64, grand_total as f64)
       })
       .unzip();

@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use super::{
-  indexed::{QuestionIdx, QuestionRef, UserIdx, UserRef},
+  indexed::{QuestionIdx, QuestionRef, UserRef},
   CorrSetInner,
 };
 use crate::{
@@ -7,13 +9,16 @@ use crate::{
   Question, Row,
 };
 use fxhash::FxHashSet as HashSet;
-use indexical::{index_vec::IndexVec, IndexedDomain};
+use indexical::{map::DenseArcIndexMap as IndexMap, IndexedDomain};
+
+pub type QuestionMap<'a, T> = IndexMap<'a, QuestionRef<'a>, T>;
+pub type UserMap<'a, T> = IndexMap<'a, UserRef<'a>, T>;
 
 pub struct IvecCorrSet<'a> {
-  questions: IndexedDomain<QuestionRef<'a>>,
-  users: IndexedDomain<UserRef<'a>>,
-  q_to_score: IndexVec<QuestionIdx, IndexVec<UserIdx, Option<u32>>>,
-  grand_totals: IndexVec<UserIdx, u32>,
+  questions: Arc<IndexedDomain<QuestionRef<'a>>>,
+  users: Arc<IndexedDomain<UserRef<'a>>>,
+  q_to_score: QuestionMap<'a, UserMap<'a, Option<u32>>>,
+  grand_totals: UserMap<'a, u32>,
 }
 
 impl<'a> CorrSetInner<'a> for IvecCorrSet<'a> {
@@ -25,21 +30,26 @@ impl<'a> CorrSetInner<'a> for IvecCorrSet<'a> {
       .iter()
       .map(|row| (UserRef(&row.user), QuestionRef(&row.question)))
       .unzip();
-    let users = IndexedDomain::from_iter(users);
-    let questions = IndexedDomain::from_iter(questions);
+    let users = Arc::new(IndexedDomain::from_iter(users));
+    let questions = Arc::new(IndexedDomain::from_iter(questions));
 
-    let empty_vec = IndexVec::from_iter(users.indices().map(|_| None));
-    let mut q_to_score = IndexVec::from_iter(questions.indices().map(|_| empty_vec.clone()));
+    println!("A");
+    let mut q_to_score = QuestionMap::new(&questions, |_| {
+      UserMap::<'_, Option<u32>>::new(&users, |_| None)
+    });
+    println!("B");
     for r in data {
-      q_to_score[questions.index(&QuestionRef(&r.question))][users.index(&UserRef(&r.user))] =
-        Some(r.score);
+      q_to_score
+        .get_mut(&QuestionRef(&r.question))
+        .unwrap()
+        .insert(UserRef(&r.user), Some(r.score));
     }
 
-    let grand_totals = users
-      .indices()
-      .map(|user| q_to_score.iter().filter_map(|v| v[user]).sum::<u32>())
-      .collect::<IndexVec<_, _>>();
-
+    println!("C");
+    let grand_totals = UserMap::new(&users, |u| {
+      q_to_score.values().filter_map(|v| v[u]).sum::<u32>()
+    });
+    println!("D");
     IvecCorrSet {
       questions,
       users,
@@ -67,7 +77,8 @@ impl<'a> CorrSetInner<'a> for IvecCorrSet<'a> {
           .iter()
           .map(|q| self.q_to_score[*q][u])
           .sum::<Option<u32>>()?;
-        Some((total as f64, self.grand_totals[u] as f64))
+        let grand_total = self.grand_totals[u];
+        Some((total as f64, grand_total as f64))
       })
       .unzip();
     utils::correlation(&qs_scores, &grand_scores)

@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use super::{
-  indexed::{QuestionIdx, QuestionRef, UserIdx, UserRef},
+  indexed::{QuestionIdx, QuestionRef, UserRef},
+  ivec::{QuestionMap, UserMap},
   CorrSetInner,
 };
 use crate::{
@@ -7,13 +10,13 @@ use crate::{
   Question, Row,
 };
 use fxhash::FxHashSet as HashSet;
-use indexical::{index_vec::IndexVec, IndexedDomain};
+use indexical::IndexedDomain;
 
 pub struct BchecksCorrSet<'a> {
-  questions: IndexedDomain<QuestionRef<'a>>,
-  users: IndexedDomain<UserRef<'a>>,
-  q_to_score: IndexVec<QuestionIdx, IndexVec<UserIdx, Option<u32>>>,
-  grand_totals: IndexVec<UserIdx, u32>,
+  questions: Arc<IndexedDomain<QuestionRef<'a>>>,
+  users: Arc<IndexedDomain<UserRef<'a>>>,
+  q_to_score: QuestionMap<'a, UserMap<'a, Option<u32>>>,
+  grand_totals: UserMap<'a, u32>,
 }
 
 impl<'a> CorrSetInner<'a> for BchecksCorrSet<'a> {
@@ -25,20 +28,22 @@ impl<'a> CorrSetInner<'a> for BchecksCorrSet<'a> {
       .iter()
       .map(|row| (UserRef(&row.user), QuestionRef(&row.question)))
       .unzip();
-    let users = IndexedDomain::from_iter(users);
-    let questions = IndexedDomain::from_iter(questions);
+    let users = Arc::new(IndexedDomain::from_iter(users));
+    let questions = Arc::new(IndexedDomain::from_iter(questions));
 
-    let empty_vec = IndexVec::from_iter(users.indices().map(|_| None));
-    let mut q_to_score = IndexVec::from_iter(questions.indices().map(|_| empty_vec.clone()));
+    let mut q_to_score = QuestionMap::new(&questions, |_| {
+      UserMap::<'_, Option<u32>>::new(&users, |_| None)
+    });
     for r in data {
-      q_to_score[questions.index(&QuestionRef(&r.question))][users.index(&UserRef(&r.user))] =
-        Some(r.score);
+      q_to_score
+        .get_mut(&QuestionRef(&r.question))
+        .unwrap()
+        .insert(UserRef(&r.user), Some(r.score));
     }
 
-    let grand_totals = users
-      .indices()
-      .map(|user| q_to_score.iter().filter_map(|v| v[user]).sum::<u32>())
-      .collect::<IndexVec<_, _>>();
+    let grand_totals = UserMap::new(&users, |u| {
+      q_to_score.values().filter_map(|v| v[u]).sum::<u32>()
+    });
 
     BchecksCorrSet {
       questions,
@@ -66,11 +71,11 @@ impl<'a> CorrSetInner<'a> for BchecksCorrSet<'a> {
         let total = qs
           .iter()
           .map(|q| unsafe {
-            let u_scores = self.q_to_score.raw.get_unchecked(q.index());
-            *u_scores.raw.get_unchecked(u.index())
+            let u_scores = self.q_to_score.get_unchecked(*q);
+            *u_scores.get_unchecked(u)
           })
           .sum::<Option<u32>>()?;
-        let grand_total = unsafe { *self.grand_totals.raw.get_unchecked(u.index()) };
+        let grand_total = unsafe { *self.grand_totals.get_unchecked(u) };
         Some((total as f64, grand_total as f64))
       })
       .unzip();

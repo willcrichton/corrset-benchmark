@@ -331,9 +331,9 @@ checksum = "74086667896a940438f2118212f313abba4aff3831fef6f4b17d02add5c8bb60"
 
 [[package]]
 name = "indexical"
-version = "0.4.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2254f1b0935a62d865cf1ac1c67f1a48ab6bf7bfafedc1904826424d6f3f1c7c"
+checksum = "381dc63b81c761a77ad066965e3ee32fde4482aa6ff636c48c79f4a0a71beffc"
 dependencies = [
  "bitvec",
  "fxhash",

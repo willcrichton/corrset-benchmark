@@ -11,7 +11,7 @@ progress = []
 [dependencies]
 float-ord = "0.3.2"
 fxhash = "0.2.1"
-indexical = { version = "0.4.2", features = ["simd"] }
+indexical = { version = "0.6.0", features = ["simd"] }
 itertools = "0.11.0"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
