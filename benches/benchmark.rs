@@ -36,7 +36,7 @@ fn corrset_outer(c: &mut Criterion) {
 }
 
 fn corrset_inner(c: &mut Criterion) {
-  let mut g = c.benchmark_group("corrset-inner");  
+  let mut g = c.benchmark_group("corrset-inner");
   let data = corrset::load_rows("data/data-large.json").unwrap();
 
   for impl_name in corrset::inner_names() {

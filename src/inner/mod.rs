@@ -2,11 +2,11 @@ use crate::{utils, Question, Row};
 use itertools::Itertools;
 
 pub mod alloc;
+pub mod basic;
 pub mod bchecks;
 pub mod bitset;
 pub mod imap;
 pub mod indexed;
-pub mod basic;
 #[cfg(test)]
 mod test_utils;
 

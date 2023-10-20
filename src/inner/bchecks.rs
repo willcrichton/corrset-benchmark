@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use super::{
-  indexed::{QuestionIdx, QuestionRef, UserRef},
   imap::{QuestionMap, UserMap},
+  indexed::{QuestionIdx, QuestionRef, UserRef},
   CorrSetInner,
 };
 use crate::{
