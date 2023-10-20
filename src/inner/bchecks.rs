@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::{
   indexed::{QuestionIdx, QuestionRef, UserRef},
-  ivec::{QuestionMap, UserMap},
+  imap::{QuestionMap, UserMap},
   CorrSetInner,
 };
 use crate::{

@@ -4,9 +4,9 @@ use itertools::Itertools;
 pub mod alloc;
 pub mod bchecks;
 pub mod bitset;
+pub mod imap;
 pub mod indexed;
-pub mod ivec;
-pub mod naive;
+pub mod basic;
 #[cfg(test)]
 mod test_utils;
 
@@ -33,9 +33,9 @@ pub trait CorrSetInner<'a>: Send + Sync + Sized {
 macro_rules! dispatch_inner_method {
   ($key:expr, $f:ident, $($arg:expr),*) => {{
     match $key {
-      "0_naive" => $f::<$crate::inner::naive::NaiveCorrSet>($($arg),*),
+      "0_basic" => $f::<$crate::inner::basic::BasicCorrSet>($($arg),*),
       "1_indexed" => $f::<$crate::inner::indexed::IndexedCorrSet>($($arg),*),
-      "2_ivec" => $f::<$crate::inner::ivec::IvecCorrSet>($($arg),*),
+      "2_imap" => $f::<$crate::inner::imap::ImapCorrSet>($($arg),*),
       "3_bchecks" => $f::<$crate::inner::bchecks::BchecksCorrSet>($($arg),*),
       "4_bitset" => $f::<$crate::inner::bitset::BvecCorrSet>($($arg),*),
       "5_simd" => $f::<$crate::inner::bitset::SimdCorrSet>($($arg),*),
@@ -47,9 +47,9 @@ macro_rules! dispatch_inner_method {
 
 pub fn inner_names() -> Vec<String> {
   vec![
-    "0_naive".into(),
+    "0_basic".into(),
     "1_indexed".into(),
-    "2_ivec".into(),
+    "2_imap".into(),
     "3_bchecks".into(),
     "4_bitset".into(),
     "5_simd".into(),

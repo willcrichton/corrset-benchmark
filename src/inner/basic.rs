@@ -3,17 +3,16 @@ use fxhash::FxHashMap as HashMap;
 
 use super::CorrSetInner;
 
-pub struct NaiveCorrSet<'a> {
+pub struct BasicCorrSet<'a> {
   q_to_score: HashMap<&'a Question, HashMap<&'a User, u32>>,
   grand_totals: HashMap<&'a User, u32>,
 }
 
-impl<'a> CorrSetInner<'a> for NaiveCorrSet<'a> {
+impl<'a> CorrSetInner<'a> for BasicCorrSet<'a> {
   type Q = &'a Question;
   type Scratch = ();
 
   fn build(data: &'a [Row]) -> Self {
-    // Setup auxiliary data structures
     let q_to_score = utils::group_by(data.iter().map(|r| (&r.question, &r.user, r.score)));
     let u_to_score = utils::group_by(data.iter().map(|r| (&r.user, &r.question, r.score)));
     let grand_totals = u_to_score
@@ -24,7 +23,7 @@ impl<'a> CorrSetInner<'a> for NaiveCorrSet<'a> {
       })
       .collect::<HashMap<_, _>>();
 
-    NaiveCorrSet {
+    BasicCorrSet {
       q_to_score,
       grand_totals,
     }
@@ -61,5 +60,5 @@ mod test {
   use super::*;
   use crate::test_inner;
 
-  test_inner!(naive, NaiveCorrSet);
+  test_inner!(naive, BasicCorrSet);
 }

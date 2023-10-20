@@ -1,6 +1,6 @@
 use super::{
+  imap::{QuestionMap, UserMap},
   indexed::{QuestionIdx, QuestionRef, UserRef},
-  ivec::{QuestionMap, UserMap},
   CorrSetInner,
 };
 use crate::{utils, utils::Captures, Question, Row};
