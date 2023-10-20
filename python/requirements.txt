@@ -1,0 +1,5 @@
+jupyter
+pandas
+tqdm
+matplotlib
+seaborn
