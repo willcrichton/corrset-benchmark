@@ -25,7 +25,7 @@ To run a single configuration, you can use the `top` binary. It takes at least t
 Check out the [`outer_names`](https://github.com/willcrichton/corrset-benchmark/blob/main/src/outer/mod.rs) and [`inner_names`](https://github.com/willcrichton/corrset-benchmark/blob/main/src/inner/mod.rs) functions to see a list of all the names. You can also optionally provide a value of `k` (default 5) and a name for the dataset (default `"large"`).
 
 
-To get a quick-and-dirty ETA for the full computation, you can run with a progress bar enabld:
+To get a quick-and-dirty ETA for the full computation, you can run with a progress bar enabled:
 
 ```
 cargo run --release --bin top --features progress -- 2_batched 6_alloc
