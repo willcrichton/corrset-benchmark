@@ -2,10 +2,17 @@ use corrset::{dispatch_inner_method, dispatch_outer_method, CorrSetInner, CorrSe
 
 fn main() {
   let mut args = std::env::args().skip(1);
-  let kind = args.next().unwrap();
-  let k = args.next().unwrap().parse::<usize>().unwrap();
+
   let outer_method = args.next().unwrap();
   let inner_method = args.next().unwrap();
+  let k = match args.next() {
+    Some(k) => k.parse::<usize>().unwrap(),
+    None => 5,
+  };
+  let kind = match args.next() {
+    Some(kind) => kind,
+    None => "large".to_string(),
+  };
 
   let data = corrset::load_rows(format!("data/data-{kind}.json")).unwrap();
 
