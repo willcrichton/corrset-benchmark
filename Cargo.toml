@@ -41,5 +41,9 @@ bench = false
 name = "top"
 bench = false
 
+[[bin]]
+name = "reuse_bitmask"
+bench = false
+
 [profile.release]
 debug = true

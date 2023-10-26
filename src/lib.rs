@@ -7,7 +7,7 @@ use std::{fs::File, io::BufReader, path::Path};
 
 pub mod inner;
 pub mod outer;
-mod utils;
+pub mod utils;
 
 pub use inner::{inner_names, CorrSetInner};
 pub use outer::{outer_names, CorrSetOuter};
