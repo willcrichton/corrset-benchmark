@@ -116,8 +116,8 @@ impl<'a> CorrSetFused<'a> {
 
   #[inline]
   pub fn k_set(&self, k: usize) -> Vec<&'a Question> {
-    let n = self.inner.questions.len();    
-    self
+    let n = self.inner.questions.len();
+    let (qs, _) = self
       .inner
       .questions
       .indices()
@@ -127,20 +127,14 @@ impl<'a> CorrSetFused<'a> {
       .map_init(
         || self.inner.init_scratch(),
         |(qs_scores, grand_scores, _), root| {
-          let mut all_qs = Vec::new();
-          let result = QuestionCombinations::new(&self.inner, root, k, qs_scores, grand_scores)
-            .inspect(|(qs, _)| all_qs.push(qs.clone()))
-            .max_by_key(|(_, r)| FloatOrd(*r));
-          println!("{root:?} {all_qs:#?}");
-          // assert_eq!(all_qs.into_iter().collect::<FxHashSet<_>>(), );
-          result
+          QuestionCombinations::new(&self.inner, root, k, qs_scores, grand_scores)
+            .max_by_key(|(_, r)| FloatOrd(*r))
         },
       )
       .flatten()
       .max_by_key(|(_, r)| FloatOrd(*r))
-      .unwrap()
-      .0
-      .into_iter()
+      .unwrap();
+    qs.into_iter()
       .map(|q| self.inner.to_question(q))
       .collect_vec()
   }
