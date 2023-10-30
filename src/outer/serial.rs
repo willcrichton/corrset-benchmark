@@ -20,16 +20,13 @@ impl CorrSetOuter for CorrSetSerial {
     combs: impl Iterator<Item = Vec<T::Q>> + Send,
   ) -> Vec<&'a Question> {
     let mut scratch = corrset.init_scratch();
-    combs
+    let (qs, _) = combs
       .filter_map(|qs| {
         let r = corrset.corr_set(&mut scratch, &qs);
         (!r.is_nan()).then_some((qs, r))
       })
       .max_by_key(|(_, r)| FloatOrd(*r))
-      .unwrap()
-      .0
-      .into_iter()
-      .map(|q| corrset.to_question(q))
-      .collect_vec()
+      .unwrap();
+    qs.into_iter().map(|q| corrset.to_question(q)).collect_vec()
   }
 }

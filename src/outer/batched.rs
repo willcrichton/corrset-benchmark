@@ -17,7 +17,7 @@ impl CorrSetOuter for CorrSetBatched {
     corrset: &T,
     combs: impl Iterator<Item = Vec<T::Q>> + Send,
   ) -> Vec<&'a Question> {
-    combs
+    let (qs, _) = combs
       .batched::<1024>()
       .par_bridge()
       .map_init(
@@ -34,10 +34,7 @@ impl CorrSetOuter for CorrSetBatched {
       )
       .flatten()
       .max_by_key(|(_, r)| FloatOrd(*r))
-      .unwrap()
-      .0
-      .into_iter()
-      .map(|q| corrset.to_question(q))
-      .collect_vec()
+      .unwrap();
+    qs.into_iter().map(|q| corrset.to_question(q)).collect_vec()
   }
 }

@@ -17,7 +17,7 @@ impl CorrSetOuter for CorrSetParallel {
     corrset: &T,
     combs: impl Iterator<Item = Vec<T::Q>> + Send,
   ) -> Vec<&'a Question> {
-    combs
+    let (qs, r) = combs
       .par_bridge()
       .map_init(
         || corrset.init_scratch(),
@@ -28,10 +28,8 @@ impl CorrSetOuter for CorrSetParallel {
       )
       .filter_map(|x| x)
       .max_by_key(|(_, r)| FloatOrd(*r))
-      .unwrap()
-      .0
-      .into_iter()
-      .map(|q| corrset.to_question(q))
-      .collect_vec()
+      .unwrap();
+    println!("r={r:?}");
+    qs.into_iter().map(|q| corrset.to_question(q)).collect_vec()
   }
 }

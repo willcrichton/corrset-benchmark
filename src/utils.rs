@@ -1,5 +1,6 @@
 use arrayvec::ArrayVec;
 use fxhash::FxHashMap as HashMap;
+use indicatif::ProgressStyle;
 use std::hash::Hash;
 
 #[inline]
@@ -23,7 +24,15 @@ pub fn correlation(a: &[f64], b: &[f64]) -> f64 {
     .sum::<f64>()
     .sqrt();
   let denom = a_var * b_var;
+
   numer / denom
+}
+
+#[allow(unused)]
+pub fn pb_style() -> ProgressStyle {
+  ProgressStyle::with_template("{elapsed_precise} [{wide_bar:.cyan/blue}] {pos}/{len} {eta}")
+    .unwrap()
+    .progress_chars("#>-")
 }
 
 #[allow(unused)]
@@ -35,17 +44,13 @@ pub fn with_pb<I>(
 ) -> impl Iterator<Item = I> + Send {
   #[cfg(feature = "progress")]
   {
-    use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
+    use indicatif::{ProgressBar, ProgressIterator};
 
     fn n_choose_k(n: usize, k: usize) -> usize {
       ((n - k + 1)..=n).product::<usize>() / (1..=k).product::<usize>()
     }
 
-    let pb = ProgressBar::new(n_choose_k(n, k) as u64).with_style(
-      ProgressStyle::with_template("{elapsed_precise} [{wide_bar:.cyan/blue}] {pos}/{len} {eta}")
-        .unwrap()
-        .progress_chars("#>-"),
-    );
+    let pb = ProgressBar::new(n_choose_k(n, k) as u64).with_style(pb_style());
 
     it.progress_with(pb)
   }

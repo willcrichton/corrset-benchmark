@@ -3,3 +3,6 @@ pandas
 tqdm
 matplotlib
 seaborn
+polars
+numpy
+numba
