@@ -1,13 +1,17 @@
-#![feature(return_position_impl_trait_in_trait, associated_type_defaults, get_many_mut)]
+#![feature(
+  return_position_impl_trait_in_trait,
+  associated_type_defaults,
+  get_many_mut
+)]
 
 use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::BufReader, path::Path};
 
+pub mod fused;
 pub mod inner;
 pub mod outer;
-pub mod fused;
 mod utils;
 
 pub use inner::{inner_names, CorrSetInner};

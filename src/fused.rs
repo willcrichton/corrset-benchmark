@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::{
   inner::{
     alloc::{AllocCorrSet, UserSet},
@@ -10,7 +8,6 @@ use crate::{
 };
 use float_ord::FloatOrd;
 
-use fxhash::FxHashSet;
 use indicatif::{ProgressBar, ProgressIterator};
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -42,9 +39,9 @@ impl<'a, 'b> QuestionCombinations<'a, 'b> {
       .collect_vec();
 
     let mut users = vec![inner.q_to_score[qs[0]].1.clone()];
-    for j in 1..k {
+    for q in &qs[1..k] {
       let mut last = users.last().unwrap().clone();
-      last.intersect(&inner.q_to_score[qs[j]].1);
+      last.intersect(&inner.q_to_score[*q].1);
       users.push(last);
     }
 
@@ -95,9 +92,9 @@ impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
     let output = (
       self.qs.clone(),
       self.inner.corr_set_score(
-        &mut self.qs_scores,
-        &mut self.grand_scores,
-        unsafe { &self.users.last().unwrap_unchecked() },
+        self.qs_scores,
+        self.grand_scores,
+        unsafe { self.users.last().unwrap_unchecked() },
         &self.qs,
       ),
     );
