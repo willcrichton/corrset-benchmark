@@ -6,17 +6,14 @@ import numba
 import numpy as np
 import pandas as pd
 
-
 def bitset_create(size):
     size_in_int64 = int(np.ceil(size / 64))
     return np.zeros(size_in_int64, dtype=np.int64)
-
 
 def bitset_add(arr, pos):
     int64_idx = pos // 64
     pos_in_int64 = pos % 64
     arr[int64_idx] |= np.int64(1) << np.int64(pos_in_int64)
-
 
 def k_corrset(data, K, max_iter=1000):
     data = data.copy()
@@ -56,7 +53,6 @@ def k_corrset(data, K, max_iter=1000):
     corrs = pd.DataFrame({"qs": [tuple(qs) for qs in qs_combinations], "r": r_vals})
     return corrs, avg_iter_time_secs
 
-
 @numba.njit(boundscheck=False, fastmath=True, parallel=True, nogil=True)
 def compute_corrs(qs_combinations, users_who_answered_q, score_matrix, grand_totals):
     num_qs = qs_combinations.shape[0]
@@ -92,7 +88,6 @@ def compute_corrs(qs_combinations, users_who_answered_q, score_matrix, grand_tot
         den = np.sqrt(n * sum_a_sq - sum_a**2) * np.sqrt(n * sum_b_sq - sum_b**2)
         corrs[i] = np.nan if den == 0 else num / den
     return corrs
-
 
 data = pd.read_json('../data/data-large.json')
 k_corrset(data, K=5, max_iter=10)  # JIT compile the function first, (avoid timing the compilation)
