@@ -1,8 +1,9 @@
 # Copied from https://github.com/sradc/corrset-benchmark-fork/blob/main/python_optimization/python_optimization.ipynb
 
+import itertools
+import time
 import numba
 import numpy as np
-import time
 import pandas as pd
 
 def bitset_create(size):
@@ -32,72 +33,63 @@ def k_corrset(data, K, max_iter=1000):
         bitset_add(users_who_answered_q[q], u)
 
     score_matrix = np.zeros(
-        (data.user.nunique(), data.question.nunique()), dtype=np.bool_
+        (data.user.nunique(), data.question.nunique()), dtype=np.int64
     )
     for row in data.itertuples():
         score_matrix[row.user, row.question] = row.score
 
-    # todo, would be nice to have a super fast iterator / generator in numba
-    # rather than creating the whole array
-    num_qs = all_qs.shape[0]
+    qs_combinations = []
+    for i, qs in enumerate(itertools.combinations(all_qs, K)):
+        if i == max_iter:
+            break
+        qs_combinations.append(qs)
+    qs_combinations = np.array(qs_combinations)
+
     start = time.time()
     r_vals = compute_corrs(
-        num_qs, max_iter, users_who_answered_q, score_matrix, grand_totals
+        qs_combinations, users_who_answered_q, score_matrix, grand_totals
     )
     avg_iter_time_secs = (time.time() - start) / max_iter
-    corrs = pd.DataFrame({"r": r_vals})
+    corrs = pd.DataFrame({"qs": [tuple(qs) for qs in qs_combinations], "r": r_vals})
     return corrs, avg_iter_time_secs
 
-@numba.njit(boundscheck=False, fastmath=True, parallel=False, nogil=True)
-def compute_corrs(num_qs, max_iter, users_who_answered_q, score_matrix, grand_totals):
+@numba.njit(boundscheck=False, fastmath=True, parallel=True, nogil=True)
+def compute_corrs(qs_combinations, users_who_answered_q, score_matrix, grand_totals):
+    num_qs = qs_combinations.shape[0]
     bitset_size = users_who_answered_q[0].shape[0]
-    corrs = np.empty(max_iter, dtype=np.float64)
-    # Compute combinations inline
-    outer_idx = 0
-    for i in range(num_qs):
-        for j in range(i + 1, num_qs):
-            for k in range(j + 1, num_qs):
-                for l in numba.prange(k + 1, num_qs):
-                    for m in numba.prange(l + 1, num_qs):
-                        qs_combination = np.array([i, j, k, l, m])
-                        # bitset will contain users who answered all questions in qs_array[i]
-                        bitset = users_who_answered_q[qs_combination[0]].copy()
-                        for q in qs_combination:
-                            bitset &= users_who_answered_q[q]
-                        # retrieve stats for the users and compute corrcoef
-                        n = 0.0
-                        sum_a = 0.0
-                        sum_b = 0.0
-                        sum_ab = 0.0
-                        sum_a_sq = 0.0
-                        sum_b_sq = 0.0
-                        for idx in range(bitset_size):
-                            if bitset[idx] != 0:
-                                for pos in range(64):
-                                    if (
-                                        bitset[idx] & (np.int64(1) << np.int64(pos))
-                                    ) != 0:
-                                        score_for_qs = 0.0
-                                        for q in qs_combination:
-                                            score_for_qs += score_matrix[
-                                                idx * 64 + pos, q
-                                            ]
-                                        score_for_user = grand_totals[idx * 64 + pos]
-                                        n += 1.0
-                                        sum_a += score_for_qs
-                                        sum_b += score_for_user
-                                        sum_ab += score_for_qs * score_for_user
-                                        sum_a_sq += score_for_qs * score_for_qs
-                                        sum_b_sq += score_for_user * score_for_user
-                        num = n * sum_ab - sum_a * sum_b
-                        den = np.sqrt(n * sum_a_sq - sum_a**2) * np.sqrt(
-                            n * sum_b_sq - sum_b**2
-                        )
-                        corrs[outer_idx] = np.nan if den == 0 else num / den
-                        outer_idx += 1
-                        if outer_idx >= max_iter:
-                            return corrs
+    corrs = np.empty(qs_combinations.shape[0], dtype=np.float64)
+    for i in numba.prange(num_qs):
+        # bitset will contain users who answered all questions in qs_array[i]
+        bitset = users_who_answered_q[qs_combinations[i, 0]].copy()
+        for q in qs_combinations[i, 1:]:
+            bitset &= users_who_answered_q[q]
+        # retrieve stats for the users and compute corrcoef
+        n = 0.0
+        sum_a = 0.0
+        sum_b = 0.0
+        sum_ab = 0.0
+        sum_a_sq = 0.0
+        sum_b_sq = 0.0
+        for idx in range(bitset_size):
+            if bitset[idx] != 0:
+                for pos in range(64):
+                    if (bitset[idx] & (np.int64(1) << np.int64(pos))) != 0:
+                        score_for_qs = 0.0
+                        for q in qs_combinations[i]:
+                            score_for_qs += score_matrix[idx * 64 + pos, q]
+                        score_for_user = grand_totals[idx * 64 + pos]
+                        n += 1.0
+                        sum_a += score_for_qs
+                        sum_b += score_for_user
+                        sum_ab += score_for_qs * score_for_user
+                        sum_a_sq += score_for_qs * score_for_qs
+                        sum_b_sq += score_for_user * score_for_user
+        num = n * sum_ab - sum_a * sum_b
+        den = np.sqrt(n * sum_a_sq - sum_a**2) * np.sqrt(n * sum_b_sq - sum_b**2)
+        corrs[i] = np.nan if den == 0 else num / den
+    return corrs
 
 data = pd.read_json('../data/data-large.json')
+k_corrset(data, K=5, max_iter=10)  # JIT compile the function first, (avoid timing the compilation)
 result, timing = k_corrset(data, K=5, max_iter=10000000)
 print(f'{timing:.9f}')
