@@ -55,13 +55,9 @@ impl<'a, 'b> QuestionCombinations<'a, 'b> {
       first: true,
     }
   }
-}
-
-impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
-  type Item = (Vec<QuestionIdx>, f64);
 
   #[inline]
-  fn next(&mut self) -> Option<Self::Item> {
+  fn fake_next(&mut self, op: &mut impl FnMut(&Vec<QuestionIdx>, f64)) -> bool {
     if self.first {
       self.first = false;
     } else {
@@ -72,7 +68,7 @@ impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
         if i > 1 {
           i -= 1;
         } else {
-          return None;
+          return false;
         }
       }
 
@@ -89,8 +85,8 @@ impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
       }
     }
 
-    let output = (
-      self.qs.clone(),
+    op(
+      &self.qs,
       self.inner.corr_set_score(
         self.qs_scores,
         self.grand_scores,
@@ -99,7 +95,7 @@ impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
       ),
     );
 
-    Some(output)
+    true
   }
 }
 
@@ -124,8 +120,27 @@ impl<'a> CorrSetFused<'a> {
       .map_init(
         || self.inner.init_scratch(),
         |(qs_scores, grand_scores, _), root| {
-          QuestionCombinations::new(&self.inner, root, k, qs_scores, grand_scores)
-            .max_by_key(|(_, r)| FloatOrd(*r))
+          let mut fake_iter =
+            QuestionCombinations::new(&self.inner, root, k, qs_scores, grand_scores);
+          let mut max_questions = Vec::new();
+          let mut max_correlation = None;
+          loop {
+            if !fake_iter.fake_next(&mut |questions, r| match max_correlation {
+              None => {
+                max_questions.clone_from(questions);
+                max_correlation = Some(r);
+              }
+              Some(mc) if mc.is_nan() || r > mc => {
+                max_questions.clone_from(questions);
+                max_correlation = Some(r);
+              }
+              _ => {}
+            }) {
+              break;
+            }
+          }
+
+          max_correlation.map(|mc| (max_questions, mc))
         },
       )
       .flatten()
