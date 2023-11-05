@@ -38,10 +38,10 @@ impl<'a, 'b> QuestionCombinations<'a, 'b> {
       .map(|j| QuestionIdx::from_usize(root.index() + j))
       .collect_vec();
 
-    let mut users = vec![inner.q_to_score[qs[0]].1.clone()];
+    let mut users = vec![inner.bitset[qs[0]].clone()];
     for q in &qs[1..k] {
       let mut last = users.last().unwrap().clone();
-      last.intersect(&inner.q_to_score[*q].1);
+      last.intersect(&inner.bitset[*q]);
       users.push(last);
     }
 
@@ -79,13 +79,13 @@ impl<'a, 'b> Iterator for QuestionCombinations<'a, 'b> {
       self.qs[i] += 1;
       let [cur, prev] = unsafe { self.users.get_many_unchecked_mut([i, i - 1]) };
       cur.clone_from(prev);
-      cur.intersect(&self.inner.q_to_score[self.qs[i]].1);
+      cur.intersect(&self.inner.bitset[self.qs[i]]);
 
       for j in (i + 1)..self.k {
         self.qs[j] = self.qs[j - 1] + 1;
         let [cur, prev] = unsafe { self.users.get_many_unchecked_mut([j, j - 1]) };
         cur.clone_from(prev);
-        cur.intersect(&self.inner.q_to_score[self.qs[j]].1);
+        cur.intersect(&self.inner.bitset[self.qs[j]]);
       }
     }
 
