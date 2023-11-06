@@ -9,11 +9,11 @@ use indexical::{bitset::simd::SimdBitset, pointer::ArcFamily, IndexSet, IndexedD
 use std::sync::Arc;
 
 pub type UserSet<'a> = IndexSet<'a, UserRef<'a>, SimdBitset<u64, 16>, ArcFamily>;
-pub type QuestionEntry<'a> = (UserMap<'a, u32>, UserSet<'a>);
 pub struct AllocCorrSet<'a> {
   pub questions: Arc<IndexedDomain<QuestionRef<'a>>>,
   pub users: Arc<IndexedDomain<UserRef<'a>>>,
-  pub q_to_score: QuestionMap<'a, QuestionEntry<'a>>,
+  pub bitset: QuestionMap<'a, UserSet<'a>>,
+  pub scores: UserMap<'a, QuestionMap<'a, u32>>,
   grand_totals: UserMap<'a, u32>,
 }
 
@@ -28,12 +28,10 @@ impl<'a> AllocCorrSet<'a> {
   ) -> f64 {
     let mut n = 0;
     for (i, u) in users.indices().enumerate() {
+      let scores = unsafe { self.scores.get_unchecked(u) };
       let total = qs
         .iter()
-        .map(|q| unsafe {
-          let (u_scores, _) = self.q_to_score.get_unchecked(*q);
-          *u_scores.get_unchecked(u)
-        })
+        .map(|q| unsafe { *scores.get_unchecked(*q) })
         .sum::<u32>();
       let grand_total = unsafe { *self.grand_totals.get_unchecked(u) };
       unsafe {
@@ -63,33 +61,24 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
     let users = Arc::new(IndexedDomain::from_iter(users));
     let questions = Arc::new(IndexedDomain::from_iter(questions));
 
-    let mut q_to_score = QuestionMap::new(&questions, |_| {
-      (
-        UserMap::<'_, u32>::new(&users, |_| 0),
-        IndexSet::new(&users),
-      )
-    });
+    let mut bitset = QuestionMap::new(&questions, |_| IndexSet::new(&users));
+    let mut scores = UserMap::new(&users, |_| QuestionMap::new(&questions, |_| 0));
     for r in data {
       let (q_idx, u_idx) = (
         questions.index(&QuestionRef(&r.question)),
         users.index(&UserRef(&r.user)),
       );
-      let (scores, set) = q_to_score.get_mut(q_idx).unwrap();
-      scores.insert(u_idx, r.score);
-      set.insert(u_idx);
+      bitset.get_mut(q_idx).unwrap().insert(u_idx);
+      scores.get_mut(u_idx).unwrap().insert(q_idx, r.score);
     }
 
-    let grand_totals = UserMap::new(&users, |u| {
-      q_to_score
-        .values()
-        .filter_map(|(scores, set)| set.contains(u).then_some(*scores.get(u).unwrap()))
-        .sum::<u32>()
-    });
+    let grand_totals = UserMap::new(&users, |u| scores.get(u).unwrap().values().sum::<u32>());
 
     AllocCorrSet {
       questions,
       users,
-      q_to_score,
+      bitset,
+      scores,
       grand_totals,
     }
   }
@@ -115,9 +104,9 @@ impl<'a> CorrSetInner<'a> for AllocCorrSet<'a> {
 
   #[inline]
   fn corr_set(&self, (qs_scores, grand_scores, users): &mut Self::Scratch, qs: &[Self::Q]) -> f64 {
-    users.clone_from(&self.q_to_score[qs[0]].1);
+    users.clone_from(&self.bitset[qs[0]]);
     for q in &qs[1..] {
-      users.intersect(&self.q_to_score[*q].1);
+      users.intersect(&self.bitset[*q]);
     }
 
     self.corr_set_score(qs_scores, grand_scores, users, qs)
